@@ -46,6 +46,19 @@ Output summary:
   No hazards flagged. Approve only if the effects above are what you intend.
 ```
 
+## Configuration
+
+```toml
+[[plugins.entries]]
+name = "tx-xray"
+
+[plugins.entries.config]
+rpc_url = "https://api.mainnet-beta.solana.com"
+```
+
+`rpc_url` is only needed for the simulation verdict; decoding is pure and
+works with `simulate=false` and no config at all.
+
 ## Threat model
 
 Assume the transaction under inspection was crafted by an attacker.

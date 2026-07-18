@@ -275,3 +275,40 @@ fn policy_fails_closed_and_rejects_raw_addresses() {
     assert!(p.check_amount(rule, "500").is_ok());
     assert!(p.check_amount(rule, "500.000001").is_err());
 }
+
+#[test]
+fn policy_parses_the_host_flat_string_config() {
+    // The ZeroClaw host stores plugin config as HashMap<String, String>
+    // (crates/zeroclaw-config PluginEntryConfig) and injects `__config` as a
+    // flat JSON object of strings, so structured values arrive as JSON in a
+    // string. This is the exact shape call_execute produces.
+    let cfg = json!({
+        "rpc_url": "https://api.mainnet-beta.solana.com",
+        "mints": "[{\"mint\":\"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v\",\
+                    \"symbol\":\"USDC\",\"decimals\":6,\"per_proposal_cap\":\"500\"}]",
+        "recipients": "{\"ana\":\"F65MT4J3kSRdyPMehKvuUvHmpCktrH9Q8n7J8dsHit68\"}",
+        "max_memo_len": "64"
+    });
+    let p = Policy::from_config(&cfg).unwrap();
+    assert!(p.resolve_mint("usdc").is_ok());
+    assert!(p.resolve_recipient("ana").is_ok());
+    assert_eq!(p.max_memo_len, 64);
+
+    // Malformed JSON inside the string is a loud refusal, not a missing key.
+    let bad = json!({
+        "mints": "[{\"mint\": nope]",
+        "recipients": "{\"ana\":\"F65MT4J3kSRdyPMehKvuUvHmpCktrH9Q8n7J8dsHit68\"}"
+    });
+    let err = Policy::from_config(&bad).unwrap_err();
+    assert!(err.contains("not valid JSON"), "got: {err}");
+
+    // A present but non-numeric max_memo_len refuses instead of silently
+    // defaulting.
+    let bad_len = json!({
+        "mints": "[{\"mint\":\"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v\",\
+                    \"symbol\":\"USDC\",\"decimals\":6,\"per_proposal_cap\":\"500\"}]",
+        "recipients": "{\"ana\":\"F65MT4J3kSRdyPMehKvuUvHmpCktrH9Q8n7J8dsHit68\"}",
+        "max_memo_len": "lots"
+    });
+    assert!(Policy::from_config(&bad_len).is_err());
+}

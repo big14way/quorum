@@ -66,10 +66,9 @@ pub fn run(rpc: &dyn Rpc, cfg: &Value, args: &ProposeArgs) -> Result<String, Str
         .map_err(|e| format!("config multisig: {e}"))?;
     let creator = Pubkey::from_base58(cfg_str(cfg, "creator_pubkey")?)
         .map_err(|e| format!("config creator_pubkey: {e}"))?;
-    let vault_index = cfg
-        .get("vault_index")
-        .and_then(|v| v.as_u64())
-        .and_then(|v| u8::try_from(v).ok())
+    let vault_index = quorum_core::policy::u64_field(cfg, "vault_index")?
+        .map(|v| u8::try_from(v).map_err(|_| "config vault_index must fit in u8".to_string()))
+        .transpose()?
         .unwrap_or(0);
 
     // 3. Live multisig state: next index and a membership sanity check.

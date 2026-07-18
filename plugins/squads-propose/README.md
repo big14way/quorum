@@ -41,23 +41,23 @@ made. The tests assert that rejected requests perform zero RPC calls.
 
 ## Configuration
 
+The ZeroClaw host stores per-plugin config as a flat string-to-string map
+(`plugins.entries[].config`), so every value is a TOML string and the
+structured policy (mint allowlist, address book) is JSON carried in a
+string. The plugin parses both and refuses loudly on malformed JSON.
+
 ```toml
-[plugins.squads-propose]
+[[plugins.entries]]
+name = "squads-propose"
+
+[plugins.entries.config]
 rpc_url = "https://api.mainnet-beta.solana.com"
 multisig = "<your multisig PDA>"
 creator_pubkey = "<the member key that signs proposal creation>"
-vault_index = 0
-max_memo_len = 96
-
-[[plugins.squads-propose.mints]]
-mint = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-symbol = "USDC"
-decimals = 6
-per_proposal_cap = "500"
-
-[plugins.squads-propose.recipients]
-ana = "<address>"
-designer = "<address>"
+vault_index = "0"
+max_memo_len = "96"
+mints = '[{"mint":"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v","symbol":"USDC","decimals":6,"per_proposal_cap":"500"}]'
+recipients = '{"ana":"<address>","designer":"<address>"}'
 ```
 
 ## Worked example

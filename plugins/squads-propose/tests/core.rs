@@ -167,3 +167,42 @@ fn happy_path_builds_verifiable_proposal_transaction() {
     assert!(summary.contains("150 USDC"));
     assert!(summary.len() < 900);
 }
+
+/// The ZeroClaw host injects `__config` as a flat map of strings (its config
+/// schema is HashMap<String, String>), so mints/recipients arrive as JSON in
+/// a string and vault_index as a decimal string. That shape must produce a
+/// transaction byte-identical to the native-JSON shape.
+#[test]
+fn host_flat_string_config_is_equivalent() {
+    let (ms_addr, ms_bytes) = multisig_state(41, 7);
+    let native = base_cfg(&ms_addr);
+    let flat = json!({
+        "rpc_url": "https://example.invalid",
+        "multisig": ms_addr.to_base58(),
+        "creator_pubkey": creator().to_base58(),
+        "vault_index": "0",
+        "mints": serde_json::to_string(&native["mints"]).unwrap(),
+        "recipients": serde_json::to_string(&native["recipients"]).unwrap(),
+    });
+
+    let mut outputs = Vec::new();
+    for cfg in [&native, &flat] {
+        let rpc = MockRpc::new();
+        rpc.push_ok("getAccountInfo", account_json(&ms_bytes));
+        rpc.push_ok(
+            "getLatestBlockhash",
+            json!({"value": {"blockhash": bs58::encode([5u8; 32]).into_string()}}),
+        );
+        outputs.push(run(&rpc, cfg, &args("ana", "150", "USDC")).unwrap());
+    }
+    assert_eq!(outputs[0], outputs[1], "flat host config must not change the transaction");
+
+    // A present but malformed vault_index refuses instead of silently
+    // becoming vault 0.
+    let mut bad = flat.clone();
+    bad["vault_index"] = json!("primary");
+    let rpc = MockRpc::new();
+    let err = run(&rpc, &bad, &args("ana", "150", "USDC")).unwrap_err();
+    assert!(err.contains("vault_index"), "{err}");
+    assert!(rpc.log.borrow().is_empty(), "must refuse before any network call");
+}

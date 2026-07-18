@@ -44,12 +44,41 @@ fn str_field<'a>(v: &'a Value, key: &str, ctx: &str) -> Result<&'a str, String> 
         .ok_or_else(|| format!("config missing required field '{key}' in {ctx}"))
 }
 
+/// The ZeroClaw host stores per-plugin config as a flat string-to-string map
+/// (`plugins.entries[].config: HashMap<String, String>`), so structured values
+/// arrive inside `__config` as JSON encoded in a string. Accept both shapes:
+/// the host's JSON-in-a-string and a native array/object. A string that fails
+/// to parse as JSON is a loud error, never a missing-key fallback.
+fn structured_field(cfg: &Value, key: &str) -> Result<Option<Value>, String> {
+    match cfg.get(key) {
+        None => Ok(None),
+        Some(Value::String(s)) => serde_json::from_str(s)
+            .map(Some)
+            .map_err(|e| format!("config '{key}' is a string but not valid JSON: {e}")),
+        Some(v) => Ok(Some(v.clone())),
+    }
+}
+
+/// Accept a config integer either natively or as a decimal string (the host's
+/// flat map makes every value a string). Present-but-malformed is an error.
+pub fn u64_field(cfg: &Value, key: &str) -> Result<Option<u64>, String> {
+    match cfg.get(key) {
+        None => Ok(None),
+        Some(v) => v
+            .as_u64()
+            .or_else(|| v.as_str().and_then(|s| s.trim().parse().ok()))
+            .map(Some)
+            .ok_or_else(|| format!("config '{key}' must be a non-negative integer")),
+    }
+}
+
 impl Policy {
     /// Build from the plugin's injected `__config` section. Every required
     /// piece must be present and well formed or this returns Err.
     pub fn from_config(cfg: &Value) -> Result<Policy, String> {
-        let mints_v = cfg
-            .get("mints")
+        let mints_owned = structured_field(cfg, "mints")?;
+        let mints_v = mints_owned
+            .as_ref()
             .and_then(|m| m.as_array())
             .ok_or("config missing 'mints' allowlist: refusing to operate without one")?;
         if mints_v.is_empty() {
@@ -75,8 +104,9 @@ impl Policy {
                 .unwrap_or(false);
             mints.push(MintRule { mint, symbol, decimals, cap_base_units, token_2022 });
         }
-        let rec_v = cfg
-            .get("recipients")
+        let rec_owned = structured_field(cfg, "recipients")?;
+        let rec_v = rec_owned
+            .as_ref()
             .and_then(|r| r.as_object())
             .ok_or("config missing 'recipients' address book: refusing to operate without one")?;
         if rec_v.is_empty() {
@@ -91,9 +121,7 @@ impl Policy {
                 .map_err(|e| format!("recipients.{name}: {e}"))?;
             recipients.insert(name.to_lowercase(), pk);
         }
-        let max_memo_len = cfg
-            .get("max_memo_len")
-            .and_then(|v| v.as_u64())
+        let max_memo_len = u64_field(cfg, "max_memo_len")?
             .map(|v| v as usize)
             .unwrap_or(96);
         Ok(Policy { mints, recipients, max_memo_len })

@@ -29,7 +29,10 @@ Action needed: 1 proposal(s) waiting on members
 ## Configuration
 
 ```toml
-[plugins.squads-watch]
+[[plugins.entries]]
+name = "squads-watch"
+
+[plugins.entries.config]
 rpc_url = "https://api.mainnet-beta.solana.com"
 multisig = "<your multisig PDA>"
 ```
