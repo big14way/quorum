@@ -29,9 +29,18 @@ fn multisig_state(transaction_index: u64, creator_perms: u8) -> (Pubkey, Vec<u8>
         rent_collector: None,
         bump,
         members: vec![
-            Member { key: creator(), permissions: creator_perms },
-            Member { key: Pubkey([8u8; 32]), permissions: 7 },
-            Member { key: Pubkey([7u8; 32]), permissions: 7 },
+            Member {
+                key: creator(),
+                permissions: creator_perms,
+            },
+            Member {
+                key: Pubkey([8u8; 32]),
+                permissions: 7,
+            },
+            Member {
+                key: Pubkey([7u8; 32]),
+                permissions: 7,
+            },
         ],
     };
     (ms_addr, encode_multisig_for_test(&state))
@@ -72,8 +81,14 @@ fn refuses_without_policy_config() {
     let rpc = MockRpc::new();
     let cfg = json!({"rpc_url": "https://x", "multisig": "F65MT4J3kSRdyPMehKvuUvHmpCktrH9Q8n7J8dsHit68", "creator_pubkey": creator().to_base58()});
     let err = run(&rpc, &cfg, &args("ana", "10", "USDC")).unwrap_err();
-    assert!(err.contains("mints"), "should refuse without an allowlist: {err}");
-    assert!(rpc.log.borrow().is_empty(), "must not touch the network before policy passes");
+    assert!(
+        err.contains("mints"),
+        "should refuse without an allowlist: {err}"
+    );
+    assert!(
+        rpc.log.borrow().is_empty(),
+        "must not touch the network before policy passes"
+    );
 }
 
 #[test]
@@ -135,7 +150,10 @@ fn happy_path_builds_verifiable_proposal_transaction() {
 
     // Re-parse the unsigned transaction and verify structure end to end.
     let parsed = parse_tx_base64(v["unsigned_tx_base64"].as_str().unwrap()).unwrap();
-    assert_eq!(parsed.num_required_signatures, 1, "only the human creator signs");
+    assert_eq!(
+        parsed.num_required_signatures, 1,
+        "only the human creator signs"
+    );
     assert_eq!(parsed.account_keys[0], creator(), "creator is fee payer");
     assert_eq!(parsed.instructions.len(), 2);
     let vtc = &parsed.instructions[0];
@@ -195,7 +213,10 @@ fn host_flat_string_config_is_equivalent() {
         );
         outputs.push(run(&rpc, cfg, &args("ana", "150", "USDC")).unwrap());
     }
-    assert_eq!(outputs[0], outputs[1], "flat host config must not change the transaction");
+    assert_eq!(
+        outputs[0], outputs[1],
+        "flat host config must not change the transaction"
+    );
 
     // A present but malformed vault_index refuses instead of silently
     // becoming vault 0.
@@ -204,5 +225,8 @@ fn host_flat_string_config_is_equivalent() {
     let rpc = MockRpc::new();
     let err = run(&rpc, &bad, &args("ana", "150", "USDC")).unwrap_err();
     assert!(err.contains("vault_index"), "{err}");
-    assert!(rpc.log.borrow().is_empty(), "must refuse before any network call");
+    assert!(
+        rpc.log.borrow().is_empty(),
+        "must refuse before any network call"
+    );
 }

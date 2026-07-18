@@ -6,7 +6,9 @@
 use quorum_core::message::{compile_legacy_message, unsigned_tx_base64, AccountMeta, Instruction};
 use quorum_core::pubkey::Pubkey;
 use quorum_core::rpc::MockRpc;
-use quorum_core::spl::{create_ata_idempotent_ix, derive_ata, memo_ix, transfer_checked_ix, TOKEN_PROGRAM};
+use quorum_core::spl::{
+    create_ata_idempotent_ix, derive_ata, memo_ix, transfer_checked_ix, TOKEN_PROGRAM,
+};
 use quorum_core::squads::{
     compile_transaction_message, proposal_create_ix, vault_transaction_create_ix,
 };
@@ -26,12 +28,29 @@ fn build_proposal_tx() -> String {
     let rec_ata = derive_ata(&recipient, &usdc(), &TOKEN_PROGRAM);
     let inner = vec![
         create_ata_idempotent_ix(&vault, &recipient, &usdc(), &TOKEN_PROGRAM),
-        transfer_checked_ix(&TOKEN_PROGRAM, &vault_ata, &usdc(), &rec_ata, &vault, 150_000_000, 6),
+        transfer_checked_ix(
+            &TOKEN_PROGRAM,
+            &vault_ata,
+            &usdc(),
+            &rec_ata,
+            &vault,
+            150_000_000,
+            6,
+        ),
         memo_ix("inv-88"),
     ];
     let msg = compile_transaction_message(&vault, &inner).unwrap();
     let outer = vec![
-        vault_transaction_create_ix(&ms, &Pubkey([5u8; 32]), &creator, &creator, 0, 0, &msg, None),
+        vault_transaction_create_ix(
+            &ms,
+            &Pubkey([5u8; 32]),
+            &creator,
+            &creator,
+            0,
+            0,
+            &msg,
+            None,
+        ),
         proposal_create_ix(&ms, &Pubkey([3u8; 32]), &creator, &creator, 42, false),
     ];
     let compiled = compile_legacy_message(&creator, &outer, &[9u8; 32]).unwrap();
@@ -52,7 +71,10 @@ fn unwraps_squads_proposal_and_shows_inner_transfer() {
     assert!(summary.contains("Token transfer: 150"), "{summary}");
     assert!(summary.contains("Memo: inv-88"), "{summary}");
     assert!(summary.contains("proposal #42"), "{summary}");
-    assert!(rpc.log.borrow().is_empty(), "simulate=false must stay offline");
+    assert!(
+        rpc.log.borrow().is_empty(),
+        "simulate=false must stay offline"
+    );
     assert!(summary.len() <= 900);
 }
 
@@ -142,6 +164,10 @@ fn receipt_stays_under_budget_with_many_instructions() {
     .unwrap();
     let v: Value = serde_json::from_str(&out).unwrap();
     let summary = v["summary"].as_str().unwrap();
-    assert!(summary.len() <= 900, "receipt overflows budget: {}", summary.len());
+    assert!(
+        summary.len() <= 900,
+        "receipt overflows budget: {}",
+        summary.len()
+    );
     assert!(summary.contains("[truncated for brevity]"));
 }

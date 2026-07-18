@@ -27,9 +27,18 @@ fn setup(transaction_index: u64) -> (Pubkey, Vec<u8>) {
         rent_collector: None,
         bump,
         members: vec![
-            Member { key: Pubkey([1u8; 32]), permissions: 7 },
-            Member { key: Pubkey([2u8; 32]), permissions: 7 },
-            Member { key: Pubkey([3u8; 32]), permissions: 1 },
+            Member {
+                key: Pubkey([1u8; 32]),
+                permissions: 7,
+            },
+            Member {
+                key: Pubkey([2u8; 32]),
+                permissions: 7,
+            },
+            Member {
+                key: Pubkey([3u8; 32]),
+                permissions: 1,
+            },
         ],
     };
     (ms_addr, encode_multisig_for_test(&state))
@@ -102,7 +111,11 @@ fn quiet_when_up_to_date() {
     let v: Value = serde_json::from_str(&out).unwrap();
     assert!(v["summary"].as_str().unwrap().contains("No new activity"));
     assert_eq!(v["pending"], json!([]));
-    assert_eq!(rpc.log.borrow().len(), 1, "no proposal fetch when nothing is new");
+    assert_eq!(
+        rpc.log.borrow().len(),
+        1,
+        "no proposal fetch when nothing is new"
+    );
 }
 
 #[test]

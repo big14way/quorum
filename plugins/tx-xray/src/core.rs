@@ -18,7 +18,9 @@ use quorum_core::policy::sanitize_untrusted;
 use quorum_core::pubkey::Pubkey;
 use quorum_core::receipt::Receipt;
 use quorum_core::rpc::{simulate_transaction_base64, Rpc};
-use quorum_core::spl::{format_base_amount, ATA_PROGRAM, MEMO_PROGRAM, TOKEN22_PROGRAM, TOKEN_PROGRAM};
+use quorum_core::spl::{
+    format_base_amount, ATA_PROGRAM, MEMO_PROGRAM, TOKEN22_PROGRAM, TOKEN_PROGRAM,
+};
 use quorum_core::squads::{
     decode_transaction_message, decode_vault_transaction_create_args, DISC_PROPOSAL_CREATE,
     DISC_VAULT_TRANSACTION_CREATE, SQUADS_PROGRAM, SYSTEM_PROGRAM,
@@ -56,7 +58,8 @@ fn describe_instruction(ix_program: &Pubkey, accounts: &[Pubkey], data: &[u8], o
                 format_base_amount(lamports, 9)
             ));
         } else {
-            out.lines.push("System program call (not a transfer)".into());
+            out.lines
+                .push("System program call (not a transfer)".into());
         }
         return;
     }
@@ -80,9 +83,8 @@ fn describe_instruction(ix_program: &Pubkey, accounts: &[Pubkey], data: &[u8], o
                 );
             }
         } else if data.first() == Some(&3) {
-            out.flags.push(
-                "plain Transfer without decimals check; prefer TransferChecked".into(),
-            );
+            out.flags
+                .push("plain Transfer without decimals check; prefer TransferChecked".into());
             out.lines.push("Token transfer (unchecked variant)".into());
         } else if data.first() == Some(&4) {
             out.flags
@@ -98,8 +100,9 @@ fn describe_instruction(ix_program: &Pubkey, accounts: &[Pubkey], data: &[u8], o
     }
     if *ix_program == ATA_PROGRAM {
         let owner = accounts.get(2).map(Pubkey::short).unwrap_or_default();
-        out.lines
-            .push(format!("Create associated token account for {owner} (idempotent)"));
+        out.lines.push(format!(
+            "Create associated token account for {owner} (idempotent)"
+        ));
         return;
     }
     if *ix_program == MEMO_PROGRAM {
@@ -137,7 +140,9 @@ fn describe_instruction(ix_program: &Pubkey, accounts: &[Pubkey], data: &[u8], o
                             .push(format!("Memo: {}", sanitize_untrusted(&m, 64)));
                     }
                 }
-                Err(e) => out.flags.push(format!("vault transaction undecodable: {e}")),
+                Err(e) => out
+                    .flags
+                    .push(format!("vault transaction undecodable: {e}")),
             }
         } else if data.len() >= 8 && data[..8] == DISC_PROPOSAL_CREATE {
             let idx = data
@@ -160,8 +165,16 @@ fn describe_instruction(ix_program: &Pubkey, accounts: &[Pubkey], data: &[u8], o
 
 pub fn run(rpc: &dyn Rpc, _cfg: &Value, args: &XrayArgs) -> Result<String, String> {
     let parsed = parse_tx_base64(&args.unsigned_tx_base64)?;
-    let mut f = Findings { lines: Vec::new(), flags: Vec::new() };
-    for ParsedInstruction { program_id, accounts, data } in &parsed.instructions {
+    let mut f = Findings {
+        lines: Vec::new(),
+        flags: Vec::new(),
+    };
+    for ParsedInstruction {
+        program_id,
+        accounts,
+        data,
+    } in &parsed.instructions
+    {
         describe_instruction(program_id, accounts, data, &mut f);
     }
 

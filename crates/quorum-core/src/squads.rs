@@ -25,8 +25,8 @@ use crate::pubkey::{find_program_address, Pubkey};
 
 /// SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf
 pub const SQUADS_PROGRAM: Pubkey = Pubkey([
-    6, 129, 196, 206, 71, 226, 35, 104, 184, 177, 85, 94, 200, 135, 175, 9, 46, 252, 126, 251,
-    182, 108, 163, 245, 47, 191, 104, 212, 172, 156, 183, 168,
+    6, 129, 196, 206, 71, 226, 35, 104, 184, 177, 85, 94, 200, 135, 175, 9, 46, 252, 126, 251, 182,
+    108, 163, 245, 47, 191, 104, 212, 172, 156, 183, 168,
 ]);
 /// System program: 32 zero bytes.
 pub const SYSTEM_PROGRAM: Pubkey = Pubkey([0u8; 32]);
@@ -54,19 +54,32 @@ pub const PERM_EXECUTE: u8 = 4;
 // PDAs
 
 pub fn multisig_pda(create_key: &Pubkey) -> (Pubkey, u8) {
-    find_program_address(&[SEED_PREFIX, SEED_MULTISIG, &create_key.0], &SQUADS_PROGRAM)
+    find_program_address(
+        &[SEED_PREFIX, SEED_MULTISIG, &create_key.0],
+        &SQUADS_PROGRAM,
+    )
 }
 
 pub fn vault_pda(multisig: &Pubkey, vault_index: u8) -> (Pubkey, u8) {
     find_program_address(
-        &[SEED_PREFIX, &multisig.0, SEED_VAULT, &vault_index.to_le_bytes()],
+        &[
+            SEED_PREFIX,
+            &multisig.0,
+            SEED_VAULT,
+            &vault_index.to_le_bytes(),
+        ],
         &SQUADS_PROGRAM,
     )
 }
 
 pub fn transaction_pda(multisig: &Pubkey, transaction_index: u64) -> (Pubkey, u8) {
     find_program_address(
-        &[SEED_PREFIX, &multisig.0, SEED_TRANSACTION, &transaction_index.to_le_bytes()],
+        &[
+            SEED_PREFIX,
+            &multisig.0,
+            SEED_TRANSACTION,
+            &transaction_index.to_le_bytes(),
+        ],
         &SQUADS_PROGRAM,
     )
 }
@@ -105,23 +118,28 @@ fn small_vec_u16_len(len: usize, out: &mut Vec<u8>) -> Result<(), String> {
 /// Key ordering mirrors the runtime convention the program indexes against:
 /// writable signers, readonly signers, writable non-signers, readonly
 /// non-signers, with program ids as readonly non-signers.
-pub fn compile_transaction_message(
-    vault: &Pubkey,
-    ixs: &[Instruction],
-) -> Result<Vec<u8>, String> {
+pub fn compile_transaction_message(vault: &Pubkey, ixs: &[Instruction]) -> Result<Vec<u8>, String> {
     struct Entry {
         pk: Pubkey,
         signer: bool,
         writable: bool,
     }
-    let mut entries: Vec<Entry> = vec![Entry { pk: *vault, signer: true, writable: false }];
+    let mut entries: Vec<Entry> = vec![Entry {
+        pk: *vault,
+        signer: true,
+        writable: false,
+    }];
     {
         let mut upsert = |pk: Pubkey, signer: bool, writable: bool| {
             if let Some(e) = entries.iter_mut().find(|e| e.pk == pk) {
                 e.signer |= signer;
                 e.writable |= writable;
             } else {
-                entries.push(Entry { pk, signer, writable });
+                entries.push(Entry {
+                    pk,
+                    signer,
+                    writable,
+                });
             }
         };
         for ix in ixs {
@@ -561,7 +579,11 @@ pub fn decode_transaction_message(bytes: &[u8]) -> Result<InnerMessage, String> 
         let program_id = *account_keys
             .get(pidx)
             .ok_or("inner program index out of range")?;
-        instructions.push(InnerInstruction { program_id, accounts, data });
+        instructions.push(InnerInstruction {
+            program_id,
+            accounts,
+            data,
+        });
     }
     let lookups = r.u8()?;
     Ok(InnerMessage {

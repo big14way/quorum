@@ -51,7 +51,9 @@ the embedded amount.
 
 ## Engineering notes
 
-`quorum-core` is a from scratch, wasm32-wasip2 friendly Solana substrate: no
+`quorum-core` (published on crates.io as `quorum-squads-core`; the plain name
+was taken by an unrelated project) is a from scratch, wasm32-wasip2 friendly
+Solana substrate: no
 solana-sdk, no async runtime. Base58, sha256 PDAs with a real ed25519
 off-curve check, compact-u16 legacy message compilation, the Squads v4
 SmallVec TransactionMessage wire format, Anchor discriminators, borsh

@@ -48,7 +48,10 @@ fn base58_constants_match_known_ids() {
 
 #[test]
 fn discriminators_match_python_sha256() {
-    assert_eq!(DISC_VAULT_TRANSACTION_CREATE, [48, 250, 78, 168, 208, 226, 218, 211]);
+    assert_eq!(
+        DISC_VAULT_TRANSACTION_CREATE,
+        [48, 250, 78, 168, 208, 226, 218, 211]
+    );
     assert_eq!(DISC_PROPOSAL_CREATE, [220, 60, 73, 224, 30, 108, 79, 159]);
 }
 
@@ -63,21 +66,36 @@ fn pda_vectors_match_python_ed25519() {
     let create_key = Pubkey([9u8; 32]);
 
     let ata = derive_ata(&owner, &usdc(), &TOKEN_PROGRAM);
-    assert_eq!(ata.to_base58(), "7EJSueeCjseYzghxU2XhcGEUn7RJDh43Z2dL6dvGy9mw");
+    assert_eq!(
+        ata.to_base58(),
+        "7EJSueeCjseYzghxU2XhcGEUn7RJDh43Z2dL6dvGy9mw"
+    );
 
     let (ms, ms_bump) = multisig_pda(&create_key);
-    assert_eq!(ms.to_base58(), "F65MT4J3kSRdyPMehKvuUvHmpCktrH9Q8n7J8dsHit68");
+    assert_eq!(
+        ms.to_base58(),
+        "F65MT4J3kSRdyPMehKvuUvHmpCktrH9Q8n7J8dsHit68"
+    );
     assert_eq!(ms_bump, 253);
 
     let (vault, vault_bump) = vault_pda(&ms, 0);
-    assert_eq!(vault.to_base58(), "DpcyqkendyzQd6yvDyHt9BEpUp2EnmXbEFUnpqAXpFAZ");
+    assert_eq!(
+        vault.to_base58(),
+        "DpcyqkendyzQd6yvDyHt9BEpUp2EnmXbEFUnpqAXpFAZ"
+    );
     assert_eq!(vault_bump, 254);
 
     let (tx, _) = transaction_pda(&ms, 1);
-    assert_eq!(tx.to_base58(), "9FH2Z2R5jZNjFe2LbaWq5uo4DWAJHYehsZDe4MKYRwos");
+    assert_eq!(
+        tx.to_base58(),
+        "9FH2Z2R5jZNjFe2LbaWq5uo4DWAJHYehsZDe4MKYRwos"
+    );
 
     let (prop, prop_bump) = proposal_pda(&ms, 1);
-    assert_eq!(prop.to_base58(), "FbLJoWRqPC4xyAU8nrHXdojvpg6G6c8pHNuW35Mzdt13");
+    assert_eq!(
+        prop.to_base58(),
+        "FbLJoWRqPC4xyAU8nrHXdojvpg6G6c8pHNuW35Mzdt13"
+    );
     assert_eq!(prop_bump, 253);
 }
 
@@ -144,7 +162,16 @@ fn vault_transaction_create_arg_bytes_are_exact() {
     let tx = Pubkey([5u8; 32]);
     let creator = Pubkey([6u8; 32]);
     let msg = vec![9u8, 9, 9];
-    let ix = vault_transaction_create_ix(&ms, &tx, &creator, &creator, 0, 0, &msg, Some("inv-1".into()));
+    let ix = vault_transaction_create_ix(
+        &ms,
+        &tx,
+        &creator,
+        &creator,
+        0,
+        0,
+        &msg,
+        Some("inv-1".into()),
+    );
     let mut expected = Vec::new();
     expected.extend_from_slice(&DISC_VAULT_TRANSACTION_CREATE);
     expected.push(0); // vault_index
@@ -186,8 +213,14 @@ fn multisig_account_roundtrip() {
         rent_collector: None,
         bump: 253,
         members: vec![
-            Member { key: Pubkey([1u8; 32]), permissions: 7 },
-            Member { key: Pubkey([2u8; 32]), permissions: 1 },
+            Member {
+                key: Pubkey([1u8; 32]),
+                permissions: 7,
+            },
+            Member {
+                key: Pubkey([2u8; 32]),
+                permissions: 1,
+            },
         ],
     };
     let bytes = encode_multisig_for_test(&state);

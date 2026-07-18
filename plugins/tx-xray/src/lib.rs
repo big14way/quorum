@@ -122,15 +122,14 @@ mod component {
             };
             emit(PluginAction::Start, None, "decoding transaction");
             let result = if tool_args.simulate {
-                let rpc_url = match cfg.get("rpc_url").and_then(|v| v.as_str()) {
-                    Some(u) if u.starts_with("https://") => u.to_string(),
-                    _ => {
-                        return Ok(fail(
+                let rpc_url =
+                    match cfg.get("rpc_url").and_then(|v| v.as_str()) {
+                        Some(u) if u.starts_with("https://") => u.to_string(),
+                        _ => return Ok(fail(
                             "config rpc_url missing or not https; set it or pass simulate=false"
                                 .into(),
-                        ))
-                    }
-                };
+                        )),
+                    };
                 run(&WakiRpc { url: rpc_url }, &cfg, &tool_args)
             } else {
                 run(&NoRpc, &cfg, &tool_args)
@@ -142,7 +141,11 @@ mod component {
                         Some(PluginOutcome::Success),
                         "receipt built",
                     );
-                    Ok(ToolResult { success: true, output, error: None })
+                    Ok(ToolResult {
+                        success: true,
+                        output,
+                        error: None,
+                    })
                 }
                 Err(e) => {
                     emit(PluginAction::Fail, Some(PluginOutcome::Failure), &e);
@@ -153,7 +156,11 @@ mod component {
     }
 
     fn fail(msg: String) -> ToolResult {
-        ToolResult { success: false, output: String::new(), error: Some(msg) }
+        ToolResult {
+            success: false,
+            output: String::new(),
+            error: Some(msg),
+        }
     }
 
     fn emit(action: PluginAction, outcome: Option<PluginOutcome>, message: &str) {

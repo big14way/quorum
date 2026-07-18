@@ -102,7 +102,13 @@ impl Policy {
                 .get("token_2022")
                 .and_then(|b| b.as_bool())
                 .unwrap_or(false);
-            mints.push(MintRule { mint, symbol, decimals, cap_base_units, token_2022 });
+            mints.push(MintRule {
+                mint,
+                symbol,
+                decimals,
+                cap_base_units,
+                token_2022,
+            });
         }
         let rec_owned = structured_field(cfg, "recipients")?;
         let rec_v = rec_owned
@@ -117,25 +123,24 @@ impl Policy {
             let addr = addr
                 .as_str()
                 .ok_or_else(|| format!("recipients.{name} must be a string address"))?;
-            let pk = Pubkey::from_base58(addr)
-                .map_err(|e| format!("recipients.{name}: {e}"))?;
+            let pk = Pubkey::from_base58(addr).map_err(|e| format!("recipients.{name}: {e}"))?;
             recipients.insert(name.to_lowercase(), pk);
         }
         let max_memo_len = u64_field(cfg, "max_memo_len")?
             .map(|v| v as usize)
             .unwrap_or(96);
-        Ok(Policy { mints, recipients, max_memo_len })
+        Ok(Policy {
+            mints,
+            recipients,
+            max_memo_len,
+        })
     }
 
     /// Look up a mint by symbol (case insensitive) or exact address, but only
     /// within the allowlist. Anything else is refused.
     pub fn resolve_mint(&self, symbol_or_address: &str) -> Result<&MintRule, String> {
         let q = symbol_or_address.trim();
-        if let Some(r) = self
-            .mints
-            .iter()
-            .find(|r| r.symbol.eq_ignore_ascii_case(q))
-        {
+        if let Some(r) = self.mints.iter().find(|r| r.symbol.eq_ignore_ascii_case(q)) {
             return Ok(r);
         }
         if let Ok(pk) = Pubkey::from_base58(q) {
@@ -204,8 +209,5 @@ impl Policy {
 /// symbols, memos in history) before it is allowed anywhere near model
 /// context. On-chain data is attacker-controlled input.
 pub fn sanitize_untrusted(s: &str, max: usize) -> String {
-    s.chars()
-        .filter(|c| !c.is_control())
-        .take(max)
-        .collect()
+    s.chars().filter(|c| !c.is_control()).take(max).collect()
 }

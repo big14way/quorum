@@ -8,8 +8,8 @@ use crate::squads::SYSTEM_PROGRAM;
 
 /// TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
 pub const TOKEN_PROGRAM: Pubkey = Pubkey([
-    6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28, 180, 133,
-    237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0, 169,
+    6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28, 180, 133, 237,
+    95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0, 169,
 ]);
 /// TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb
 pub const TOKEN22_PROGRAM: Pubkey = Pubkey([
@@ -23,8 +23,8 @@ pub const ATA_PROGRAM: Pubkey = Pubkey([
 ]);
 /// MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr
 pub const MEMO_PROGRAM: Pubkey = Pubkey([
-    5, 74, 83, 90, 153, 41, 33, 6, 77, 36, 232, 113, 96, 218, 56, 124, 124, 53, 181, 221, 188,
-    146, 187, 129, 228, 31, 168, 64, 65, 5, 68, 141,
+    5, 74, 83, 90, 153, 41, 33, 6, 77, 36, 232, 113, 96, 218, 56, 124, 124, 53, 181, 221, 188, 146,
+    187, 129, 228, 31, 168, 64, 65, 5, 68, 141,
 ]);
 
 /// Associated token account address for (owner, mint) under a token program.

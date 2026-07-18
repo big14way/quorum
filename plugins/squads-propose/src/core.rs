@@ -24,9 +24,11 @@ use quorum_core::policy::Policy;
 use quorum_core::pubkey::Pubkey;
 use quorum_core::receipt::Receipt;
 use quorum_core::rpc::{get_account_base64, get_latest_blockhash, Rpc};
-use quorum_core::spl::{create_ata_idempotent_ix, derive_ata, format_base_amount, memo_ix, transfer_checked_ix};
+use quorum_core::spl::{
+    create_ata_idempotent_ix, derive_ata, format_base_amount, memo_ix, transfer_checked_ix,
+};
 use quorum_core::squads::{
-    decode_multisig, compile_transaction_message, proposal_create_ix, proposal_pda,
+    compile_transaction_message, decode_multisig, proposal_create_ix, proposal_pda,
     transaction_pda, vault_pda, vault_transaction_create_ix, PERM_INITIATE,
 };
 use serde::Deserialize;

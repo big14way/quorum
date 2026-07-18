@@ -16,10 +16,18 @@ pub struct AccountMeta {
 
 impl AccountMeta {
     pub fn writable(pubkey: Pubkey, is_signer: bool) -> Self {
-        Self { pubkey, is_signer, is_writable: true }
+        Self {
+            pubkey,
+            is_signer,
+            is_writable: true,
+        }
     }
     pub fn readonly(pubkey: Pubkey, is_signer: bool) -> Self {
-        Self { pubkey, is_signer, is_writable: false }
+        Self {
+            pubkey,
+            is_signer,
+            is_writable: false,
+        }
     }
 }
 
@@ -80,7 +88,11 @@ fn collect_keys(payer: &Pubkey, ixs: &[Instruction]) -> Vec<KeyEntry> {
             e.is_signer |= signer;
             e.is_writable |= writable;
         } else {
-            entries.push(KeyEntry { pubkey: pk, is_signer: signer, is_writable: writable });
+            entries.push(KeyEntry {
+                pubkey: pk,
+                is_signer: signer,
+                is_writable: writable,
+            });
         }
     };
     for ix in ixs {
@@ -131,8 +143,14 @@ pub fn compile_legacy_message(
         return Err("too many account keys".into());
     }
     let num_required_signatures = keys.iter().filter(|k| k.is_signer).count() as u8;
-    let num_readonly_signed = keys.iter().filter(|k| k.is_signer && !k.is_writable).count() as u8;
-    let num_readonly_unsigned = keys.iter().filter(|k| !k.is_signer && !k.is_writable).count() as u8;
+    let num_readonly_signed = keys
+        .iter()
+        .filter(|k| k.is_signer && !k.is_writable)
+        .count() as u8;
+    let num_readonly_unsigned = keys
+        .iter()
+        .filter(|k| !k.is_signer && !k.is_writable)
+        .count() as u8;
 
     let index_of = |pk: &Pubkey| -> Result<u8, String> {
         keys.iter()
@@ -245,11 +263,7 @@ pub fn parse_tx_base64(b64: &str) -> Result<ParsedMessage, String> {
         let mut accounts = Vec::with_capacity(nacc);
         for _ in 0..nacc {
             let i = *raw.get(pos).ok_or("truncated account index")? as usize;
-            accounts.push(
-                *account_keys
-                    .get(i)
-                    .ok_or("account index out of range")?,
-            );
+            accounts.push(*account_keys.get(i).ok_or("account index out of range")?);
             pos += 1;
         }
         let (dlen, used) = shortvec_read(&raw[pos..])?;
@@ -259,10 +273,12 @@ pub fn parse_tx_base64(b64: &str) -> Result<ParsedMessage, String> {
         }
         let data = raw[pos..pos + dlen].to_vec();
         pos += dlen;
-        let program_id = *account_keys
-            .get(pidx)
-            .ok_or("program index out of range")?;
-        instructions.push(ParsedInstruction { program_id, accounts, data });
+        let program_id = *account_keys.get(pidx).ok_or("program index out of range")?;
+        instructions.push(ParsedInstruction {
+            program_id,
+            accounts,
+            data,
+        });
     }
     Ok(ParsedMessage {
         num_required_signatures,

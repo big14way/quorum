@@ -13,7 +13,10 @@ pub struct Receipt {
 
 impl Receipt {
     pub fn new() -> Self {
-        Self { lines: Vec::new(), truncated: false }
+        Self {
+            lines: Vec::new(),
+            truncated: false,
+        }
     }
 
     pub fn line(&mut self, s: impl Into<String>) {

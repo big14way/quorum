@@ -126,7 +126,11 @@ mod component {
                         Some(PluginOutcome::Success),
                         "status built",
                     );
-                    Ok(ToolResult { success: true, output, error: None })
+                    Ok(ToolResult {
+                        success: true,
+                        output,
+                        error: None,
+                    })
                 }
                 Err(e) => {
                     emit(PluginAction::Fail, Some(PluginOutcome::Failure), &e);
@@ -137,7 +141,11 @@ mod component {
     }
 
     fn fail(msg: String) -> ToolResult {
-        ToolResult { success: false, output: String::new(), error: Some(msg) }
+        ToolResult {
+            success: false,
+            output: String::new(),
+            error: Some(msg),
+        }
     }
 
     fn emit(action: PluginAction, outcome: Option<PluginOutcome>, message: &str) {

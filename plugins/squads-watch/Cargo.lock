@@ -374,7 +374,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "quorum-core"
+name = "quorum-squads-core"
 version = "0.1.0"
 dependencies = [
  "base64",
@@ -490,7 +490,7 @@ name = "squads-watch"
 version = "0.1.0"
 dependencies = [
  "base64",
- "quorum-core",
+ "quorum-squads-core",
  "serde",
  "serde_json",
  "waki",

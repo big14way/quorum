@@ -1,12 +1,18 @@
 [package]
-name = "quorum-core"
+# Published as quorum-squads-core ("quorum-core" was taken on crates.io by an
+# unrelated project); the lib target stays quorum_core so code imports are
+# unchanged.
+name = "quorum-squads-core"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
 description = "Pure Rust, wasm32-wasip2 friendly Solana core for ZeroClaw tool plugins: base58, PDAs, legacy tx construction, Squads v4 encoding and decoding, SPL token instructions, RPC trait with mock, fail-closed policy, token-capped receipts. No solana-sdk, no tokio, no wasm deps."
-publish = false
+repository = "https://github.com/big14way/quorum"
+keywords = ["solana", "squads", "multisig", "wasm", "zeroclaw"]
+categories = ["cryptography::cryptocurrencies", "wasm"]
 
 [lib]
+name = "quorum_core"
 crate-type = ["rlib"]
 
 [dependencies]

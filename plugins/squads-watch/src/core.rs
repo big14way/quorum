@@ -108,7 +108,10 @@ pub fn run(rpc: &dyn Rpc, cfg: &Value, args: &WatchArgs) -> Result<String, Strin
         }
     }
     if last < ti {
-        r.line(format!("{} more not shown; call again with cursor={last}", ti - last));
+        r.line(format!(
+            "{} more not shown; call again with cursor={last}",
+            ti - last
+        ));
     }
     if !pending.is_empty() {
         r.line(format!(

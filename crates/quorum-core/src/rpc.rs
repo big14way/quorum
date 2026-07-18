@@ -68,10 +68,7 @@ pub fn get_multiple_accounts_base64(
 
 /// getLatestBlockhash, decoded from base58 to raw 32 bytes.
 pub fn get_latest_blockhash(rpc: &dyn Rpc) -> Result<[u8; 32], String> {
-    let res = rpc.call(
-        "getLatestBlockhash",
-        json!([{"commitment": "confirmed"}]),
-    )?;
+    let res = rpc.call("getLatestBlockhash", json!([{"commitment": "confirmed"}]))?;
     let bh = res
         .get("value")
         .and_then(|v| v.get("blockhash"))
@@ -126,9 +123,7 @@ impl MockRpc {
 
 impl Rpc for MockRpc {
     fn call(&self, method: &str, params: Value) -> Result<Value, String> {
-        self.log
-            .borrow_mut()
-            .push(format!("{method} {params}"));
+        self.log.borrow_mut().push(format!("{method} {params}"));
         self.queues
             .borrow_mut()
             .get_mut(method)
