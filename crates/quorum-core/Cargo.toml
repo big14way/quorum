@@ -3,7 +3,7 @@
 # unrelated project); the lib target stays quorum_core so code imports are
 # unchanged.
 name = "quorum-squads-core"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "MIT"
 description = "Pure Rust, wasm32-wasip2 friendly Solana core for ZeroClaw tool plugins: base58, PDAs, legacy tx construction, Squads v4 encoding and decoding, SPL token instructions, RPC trait with mock, fail-closed policy, token-capped receipts. No solana-sdk, no tokio, no wasm deps."
@@ -23,5 +23,10 @@ zeroize = "=1.7.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.22"
+
+[dev-dependencies]
+# The vectors test re-derives Anchor discriminators from scratch so the
+# constants are checked against a real sha256, not against themselves.
+sha2 = "0.10"
 
 [workspace]

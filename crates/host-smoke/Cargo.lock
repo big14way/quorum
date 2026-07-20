@@ -1270,9 +1270,7 @@ dependencies = [
 
 [[package]]
 name = "quorum-squads-core"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c36eb1081c5331cb798f9ea504e7f6530603c4c9542bbc3c6484136e819de380"
+version = "0.1.1"
 dependencies = [
  "base64",
  "bs58",

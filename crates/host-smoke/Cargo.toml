@@ -14,8 +14,14 @@ publish = false
 [dev-dependencies]
 zeroclaw-plugins = { git = "https://github.com/zeroclaw-labs/zeroclaw", rev = "fc8b4d83e3a5eacd98486aaa51785b07a6c733dd", default-features = false, features = ["plugins-wasm-cranelift"] }
 zeroclaw-api = { git = "https://github.com/zeroclaw-labs/zeroclaw", rev = "fc8b4d83e3a5eacd98486aaa51785b07a6c733dd" }
-quorum-squads-core = "0.1.0"
+quorum-squads-core = "0.1.1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 serde_json = "1"
 
 [workspace]
+
+# Test the LOCAL core, not the published copy, so a regression is caught here
+# before it ships. The wasm components this harness loads are also built from
+# the local core (the plugins depend on it by path), keeping both sides in sync.
+[patch.crates-io]
+quorum-squads-core = { path = "../quorum-core" }

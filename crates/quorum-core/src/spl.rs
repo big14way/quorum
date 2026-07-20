@@ -131,7 +131,12 @@ pub fn parse_ui_amount(s: &str, decimals: u8) -> Result<u64, String> {
             "too many decimal places: mint has {decimals} decimals"
         ));
     }
-    let scale: u128 = 10u128.pow(decimals as u32);
+    // 10^decimals must stay inside u128; decimals is a u8, so guard with
+    // checked_pow and fail closed rather than overflowing (Policy also bounds
+    // decimals at config time, this is defence in depth).
+    let scale: u128 = 10u128
+        .checked_pow(decimals as u32)
+        .ok_or("mint decimals out of range")?;
     let int_val: u128 = if int_part.is_empty() {
         0
     } else {
@@ -142,7 +147,10 @@ pub fn parse_ui_amount(s: &str, decimals: u8) -> Result<u64, String> {
     } else {
         frac_part.parse::<u128>().map_err(|_| "amount too large")?
     };
-    frac_val *= 10u128.pow((decimals as usize - frac_part.len()) as u32);
+    let frac_scale = 10u128
+        .checked_pow((decimals as usize - frac_part.len()) as u32)
+        .ok_or("mint decimals out of range")?;
+    frac_val = frac_val.checked_mul(frac_scale).ok_or("amount overflow")?;
     let total = int_val
         .checked_mul(scale)
         .and_then(|v| v.checked_add(frac_val))
@@ -154,11 +162,22 @@ pub fn parse_ui_amount(s: &str, decimals: u8) -> Result<u64, String> {
 }
 
 /// Format base units back to a trimmed decimal string for receipts.
+///
+/// `decimals` can arrive from untrusted transaction bytes (tx-xray reads it
+/// out of a TransferChecked instruction), so the scale is computed in u128
+/// with checked_pow. A wrapped `10u64.pow` could be 0 and divide-by-zero
+/// would trap the wasm instance in the shipped overflow-checks-off release
+/// build; here an out-of-range decimals fails to a plain, honest string
+/// instead.
 pub fn format_base_amount(amount: u64, decimals: u8) -> String {
     if decimals == 0 {
         return amount.to_string();
     }
-    let scale = 10u64.pow(decimals as u32);
+    let scale = match 10u128.checked_pow(decimals as u32) {
+        Some(s) => s,
+        None => return format!("{amount} base units (decimals {decimals} unrepresentable)"),
+    };
+    let amount = amount as u128;
     let int_part = amount / scale;
     let frac_part = amount % scale;
     if frac_part == 0 {

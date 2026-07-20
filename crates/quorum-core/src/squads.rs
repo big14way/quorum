@@ -289,11 +289,17 @@ impl<'a> Reader<'a> {
         Self { buf, pos: 0 }
     }
     fn take(&mut self, n: usize) -> Result<&'a [u8], String> {
-        if self.pos + n > self.buf.len() {
+        // Overflow-safe: `self.pos + n` would wrap a 32-bit usize on the
+        // wasm32 target and defeat the bounds check, so a length field like
+        // 0xFFFFFFFF from an untrusted transaction would slip through and
+        // panic on the slice (a hard wasm trap). Compare against the
+        // remaining bytes instead, which cannot overflow.
+        if n > self.buf.len() - self.pos {
             return Err("truncated account data".into());
         }
-        let s = &self.buf[self.pos..self.pos + n];
-        self.pos += n;
+        let end = self.pos + n;
+        let s = &self.buf[self.pos..end];
+        self.pos = end;
         Ok(s)
     }
     fn u8(&mut self) -> Result<u8, String> {

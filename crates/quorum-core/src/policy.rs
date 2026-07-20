@@ -72,6 +72,55 @@ pub fn u64_field(cfg: &Value, key: &str) -> Result<Option<u64>, String> {
     }
 }
 
+/// Accept a config boolean either natively or as the string "true"/"false".
+/// A present-but-malformed value is an error, not a silent default.
+pub fn bool_field(cfg: &Value, key: &str) -> Result<Option<bool>, String> {
+    match cfg.get(key) {
+        None => Ok(None),
+        Some(Value::Bool(b)) => Ok(Some(*b)),
+        Some(Value::String(s)) => match s.trim() {
+            "true" => Ok(Some(true)),
+            "false" => Ok(Some(false)),
+            _ => Err(format!("config '{key}' must be true or false")),
+        },
+        Some(_) => Err(format!("config '{key}' must be a boolean")),
+    }
+}
+
+/// Largest mint decimals we support. 10^18 is the practical ceiling for SPL
+/// mints and keeps every 10^decimals computation inside u64/u128.
+pub const MAX_DECIMALS: u8 = 18;
+
+/// A character that must never survive into model context or an on-chain
+/// memo: C0/C1 controls plus the invisible and bidirectional-formatting code
+/// points (zero-width spaces, bidi overrides/isolates, line/paragraph
+/// separators, BOM) that can hide or reorder text a human is meant to read.
+fn is_display_unsafe(c: char) -> bool {
+    c.is_control()
+        || matches!(c,
+            '\u{200B}'..='\u{200F}'   // zero-width space/joiner + LRM/RLM
+            | '\u{202A}'..='\u{202E}' // bidi embeddings and overrides
+            | '\u{2060}'..='\u{2064}' // word joiner, invisible operators
+            | '\u{2066}'..='\u{2069}' // bidi isolates
+            | '\u{2028}' | '\u{2029}' // line / paragraph separators
+            | '\u{FEFF}') // BOM / zero-width no-break space
+}
+
+/// Collect characters until adding the next one would exceed `max_bytes`,
+/// respecting UTF-8 boundaries. Caps by byte length because the memo and any
+/// receipt line are emitted as bytes, and a multi-byte character budget must
+/// be counted in bytes, not chars.
+fn take_bytes(chars: impl Iterator<Item = char>, max_bytes: usize) -> String {
+    let mut out = String::new();
+    for c in chars {
+        if out.len() + c.len_utf8() > max_bytes {
+            break;
+        }
+        out.push(c);
+    }
+    out
+}
+
 impl Policy {
     /// Build from the plugin's injected `__config` section. Every required
     /// piece must be present and well formed or this returns Err.
@@ -92,16 +141,27 @@ impl Policy {
             let symbol = str_field(m, "symbol", &ctx)?.to_string();
             let decimals = m
                 .get("decimals")
-                .and_then(|d| d.as_u64())
+                .and_then(|d| {
+                    d.as_u64()
+                        .or_else(|| d.as_str().and_then(|s| s.trim().parse().ok()))
+                })
                 .and_then(|d| u8::try_from(d).ok())
                 .ok_or_else(|| format!("{ctx} missing valid 'decimals'"))?;
+            // Bound decimals so 10^decimals stays representable in the amount
+            // math and the receipt formatter (real SPL mints are <= ~9); this
+            // fails closed on an absurd config rather than overflowing later.
+            if decimals > MAX_DECIMALS {
+                return Err(format!(
+                    "{ctx}.decimals {decimals} exceeds the supported maximum of {MAX_DECIMALS}"
+                ));
+            }
             let cap_str = str_field(m, "per_proposal_cap", &ctx)?;
             let cap_base_units = parse_ui_amount(cap_str, decimals)
                 .map_err(|e| format!("{ctx}.per_proposal_cap: {e}"))?;
-            let token_2022 = m
-                .get("token_2022")
-                .and_then(|b| b.as_bool())
-                .unwrap_or(false);
+            // token_2022 arrives as a string in the host's flat config; parse
+            // bool-or-string and refuse a malformed value rather than silently
+            // treating a Token-2022 mint as a legacy Token mint.
+            let token_2022 = bool_field(m, "token_2022")?.unwrap_or(false);
             mints.push(MintRule {
                 mint,
                 symbol,
@@ -192,22 +252,25 @@ impl Policy {
         Ok(amount)
     }
 
-    /// Memos are length-capped and control characters are stripped, so a memo
-    /// can never be a payload.
+    /// Memos are byte-length-capped and stripped of control and invisible /
+    /// bidirectional characters, so a memo can never be a payload nor exceed
+    /// its byte budget. `max_memo_len` is a byte budget.
     pub fn sanitize_memo(&self, memo: Option<&str>) -> Option<String> {
         memo.map(|m| {
-            m.chars()
-                .filter(|c| !c.is_control())
-                .take(self.max_memo_len)
-                .collect()
+            take_bytes(
+                m.chars().filter(|c| !is_display_unsafe(*c)),
+                self.max_memo_len,
+            )
         })
         .filter(|s: &String| !s.is_empty())
     }
 }
 
-/// Strip and length-cap any string that originated on-chain (token names,
-/// symbols, memos in history) before it is allowed anywhere near model
-/// context. On-chain data is attacker-controlled input.
+/// Strip and byte-length-cap any string that originated on-chain (token
+/// names, symbols, memos in history) before it is allowed anywhere near model
+/// context. On-chain data is attacker-controlled input: control characters
+/// and invisible / bidirectional formatting code points are removed, and the
+/// result is capped in bytes.
 pub fn sanitize_untrusted(s: &str, max: usize) -> String {
-    s.chars().filter(|c| !c.is_control()).take(max).collect()
+    take_bytes(s.chars().filter(|c| !is_display_unsafe(*c)), max)
 }

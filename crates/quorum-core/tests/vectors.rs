@@ -15,12 +15,14 @@ use quorum_core::spl::{
     TOKEN_PROGRAM,
 };
 use quorum_core::squads::{
-    compile_transaction_message, decode_multisig, decode_proposal, encode_multisig_for_test,
-    encode_proposal_for_test, multisig_pda, proposal_create_ix, proposal_pda, transaction_pda,
-    vault_pda, vault_transaction_create_ix, Member, MultisigState, ProposalState, ProposalStatus,
-    DISC_PROPOSAL_CREATE, DISC_VAULT_TRANSACTION_CREATE, SQUADS_PROGRAM,
+    compile_transaction_message, decode_multisig, decode_proposal,
+    decode_vault_transaction_create_args, encode_multisig_for_test, encode_proposal_for_test,
+    multisig_pda, proposal_create_ix, proposal_pda, transaction_pda, vault_pda,
+    vault_transaction_create_ix, Member, MultisigState, ProposalState, ProposalStatus,
+    ACCT_MULTISIG, ACCT_PROPOSAL, DISC_PROPOSAL_APPROVE, DISC_PROPOSAL_CREATE,
+    DISC_VAULT_TRANSACTION_CREATE, SQUADS_PROGRAM,
 };
-use serde_json::json;
+use serde_json::{json, Value};
 
 #[test]
 fn base58_constants_match_known_ids() {
@@ -46,13 +48,36 @@ fn base58_constants_match_known_ids() {
     );
 }
 
+/// Anchor discriminators are the first 8 bytes of sha256 of a namespaced
+/// name: "global:<instruction>" for instructions, "account:<Account>" for
+/// account structs. Re-derive them here so the shipped constants are checked
+/// against a real hash of the Squads v4 names, not against their own literals.
+fn anchor_disc(namespace: &str, name: &str) -> [u8; 8] {
+    use sha2::{Digest, Sha256};
+    let mut h = Sha256::new();
+    h.update(format!("{namespace}:{name}").as_bytes());
+    let d = h.finalize();
+    let mut out = [0u8; 8];
+    out.copy_from_slice(&d[..8]);
+    out
+}
+
 #[test]
-fn discriminators_match_python_sha256() {
+fn discriminators_derive_from_sha256_of_squads_names() {
     assert_eq!(
         DISC_VAULT_TRANSACTION_CREATE,
-        [48, 250, 78, 168, 208, 226, 218, 211]
+        anchor_disc("global", "vault_transaction_create")
     );
-    assert_eq!(DISC_PROPOSAL_CREATE, [220, 60, 73, 224, 30, 108, 79, 159]);
+    assert_eq!(
+        DISC_PROPOSAL_CREATE,
+        anchor_disc("global", "proposal_create")
+    );
+    assert_eq!(
+        DISC_PROPOSAL_APPROVE,
+        anchor_disc("global", "proposal_approve")
+    );
+    assert_eq!(ACCT_MULTISIG, anchor_disc("account", "Multisig"));
+    assert_eq!(ACCT_PROPOSAL, anchor_disc("account", "Proposal"));
 }
 
 fn usdc() -> Pubkey {
@@ -344,4 +369,143 @@ fn policy_parses_the_host_flat_string_config() {
         "max_memo_len": "lots"
     });
     assert!(Policy::from_config(&bad_len).is_err());
+}
+
+fn mint_cfg(decimals: &str, token_2022: Value) -> Value {
+    json!({
+        "mints": [{
+            "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "symbol": "USDC",
+            "decimals": decimals,
+            "per_proposal_cap": "500",
+            "token_2022": token_2022,
+        }],
+        "recipients": {"ana": "F65MT4J3kSRdyPMehKvuUvHmpCktrH9Q8n7J8dsHit68"}
+    })
+}
+
+#[test]
+fn policy_bounds_decimals_and_parses_token2022_string() {
+    // Absurd decimals fail closed at config time.
+    assert!(Policy::from_config(&mint_cfg("20", json!(false))).is_err());
+    assert!(Policy::from_config(&mint_cfg("6", json!(false))).is_ok());
+
+    // The host stores everything as strings: "true"/"false" must parse, and a
+    // Token-2022 mint must NOT silently resolve to the legacy token program.
+    let p = Policy::from_config(&mint_cfg("6", json!("true"))).unwrap();
+    assert!(p.resolve_mint("USDC").unwrap().token_2022);
+    let p = Policy::from_config(&mint_cfg("6", json!("false"))).unwrap();
+    assert!(!p.resolve_mint("USDC").unwrap().token_2022);
+    // A malformed boolean refuses rather than defaulting to false.
+    assert!(Policy::from_config(&mint_cfg("6", json!("yes"))).is_err());
+}
+
+#[test]
+fn sanitize_strips_bidi_zero_width_and_caps_bytes() {
+    use quorum_core::policy::sanitize_untrusted;
+    // Bidi override, zero-width space, and a line separator are all removed.
+    let dirty = "USDC\u{202E}evil\u{200B}x\u{2028}y";
+    let clean = sanitize_untrusted(dirty, 64);
+    assert_eq!(clean, "USDCevilxy");
+    assert!(!clean
+        .chars()
+        .any(|c| c == '\u{202E}' || c == '\u{200B}' || c == '\u{2028}'));
+    // The cap is in bytes: a 4-byte emoji budget of 6 keeps at most one.
+    let capped = sanitize_untrusted("\u{1F4B0}\u{1F4B0}\u{1F4B0}", 6);
+    assert!(
+        capped.len() <= 6,
+        "byte length {} exceeds cap",
+        capped.len()
+    );
+}
+
+#[test]
+fn policy_memo_is_byte_capped_and_stripped() {
+    let cfg = mint_cfg("6", json!(false));
+    let mut cfg = cfg;
+    cfg["max_memo_len"] = json!(8);
+    let p = Policy::from_config(&cfg).unwrap();
+    // Control chars stripped; multi-byte content capped in bytes not chars.
+    let memo = p.sanitize_memo(Some("ab\ncd\u{1F4B0}\u{1F4B0}\u{1F4B0}"));
+    let memo = memo.unwrap();
+    assert!(!memo.contains('\n'));
+    assert!(
+        memo.len() <= 8,
+        "memo byte length {} exceeds cap",
+        memo.len()
+    );
+}
+
+#[test]
+fn format_base_amount_never_traps_for_any_decimals() {
+    // decimals >= 64 would make 10u64.pow wrap to 0 -> divide-by-zero trap in
+    // the overflow-checks-off release build; the u128/checked path is safe.
+    for d in [0u8, 6, 9, 18, 19, 20, 38, 39, 64, 200, 255] {
+        let s = format_base_amount(1_234_567, d);
+        assert!(!s.is_empty());
+    }
+    assert_eq!(format_base_amount(1_500_000, 6), "1.5");
+}
+
+#[test]
+fn parse_ui_amount_fails_closed_on_oversized_decimals() {
+    // 10^39 overflows u128; must be a Result error, not a panic.
+    assert!(parse_ui_amount("1", 39).is_err());
+    assert!(parse_ui_amount("1.5", 40).is_err());
+}
+
+#[test]
+fn shortvec_rejects_noncanonical_and_over_u16() {
+    // Canonical values still round-trip.
+    for n in [0usize, 1, 127, 128, 16383, 65535] {
+        let mut buf = Vec::new();
+        shortvec_len(n, &mut buf);
+        assert_eq!(shortvec_read(&buf).unwrap().0, n);
+    }
+    // Non-minimal encoding of 0 is rejected.
+    assert!(shortvec_read(&[0x80, 0x00]).is_err());
+    // A value above u16::MAX is rejected.
+    assert!(shortvec_read(&[0xff, 0xff, 0x7f]).is_err());
+}
+
+#[test]
+fn reader_take_is_overflow_safe_on_huge_length() {
+    // A vault_transaction_create claiming a 0xFFFFFFFF message length must
+    // return an error, never overflow the 32-bit wasm bounds check and trap.
+    let mut data = Vec::new();
+    data.extend_from_slice(&DISC_VAULT_TRANSACTION_CREATE);
+    data.push(0); // vault_index
+    data.push(0); // ephemeral_signers
+    data.extend_from_slice(&0xFFFF_FFFFu32.to_le_bytes()); // message length
+    assert!(decode_vault_transaction_create_args(&data).is_err());
+}
+
+#[test]
+fn parser_rejects_versioned_v0_message() {
+    // Base64 of [0x00, 0x80, 0x00, 0x00]: zero signatures, then a message
+    // whose first byte has the version bit set. Must be rejected, not
+    // misparsed as a huge signature/header.
+    let err = parse_tx_base64("AIAAAA==").unwrap_err();
+    assert!(err.contains("versioned"), "got: {err}");
+}
+
+#[test]
+fn compile_rejects_too_many_signatures() {
+    // 128+ signers would set the high bit of the first message byte and
+    // collide with the v0 marker; the compiler must refuse.
+    let payer = Pubkey([1u8; 32]);
+    let accounts: Vec<AccountMeta> = (0u16..200)
+        .map(|i| {
+            let mut b = [0u8; 32];
+            b[0..2].copy_from_slice(&i.to_le_bytes());
+            b[31] = 9;
+            AccountMeta::writable(Pubkey(b), true)
+        })
+        .collect();
+    let ix = Instruction {
+        program_id: Pubkey([7u8; 32]),
+        accounts,
+        data: vec![0],
+    };
+    assert!(compile_legacy_message(&payer, &[ix], &[0u8; 32]).is_err());
 }

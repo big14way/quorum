@@ -53,13 +53,26 @@ pub fn shortvec_len(mut n: usize, out: &mut Vec<u8>) {
     }
 }
 
-/// Read a compact-u16 length. Returns (value, bytes consumed).
+/// Read a compact-u16 length. Returns (value, bytes consumed). Matches
+/// Solana's `decode_shortu16_len`: the value must fit in a u16 and the
+/// encoding must be minimal (a trailing zero continuation byte, or a value
+/// above u16::MAX, is rejected) so a decoder cannot be fed a non-canonical
+/// length the compiler would never emit.
 pub fn shortvec_read(buf: &[u8]) -> Result<(usize, usize), String> {
     let mut n: usize = 0;
     let mut shift = 0u32;
     for (i, b) in buf.iter().enumerate().take(3) {
-        n |= ((b & 0x7f) as usize) << shift;
+        let val = (b & 0x7f) as usize;
+        n |= val << shift;
         if b & 0x80 == 0 {
+            // A terminal byte past the first that contributes nothing means
+            // the length could have been encoded in fewer bytes.
+            if i > 0 && val == 0 {
+                return Err("non-canonical shortvec length".into());
+            }
+            if n > u16::MAX as usize {
+                return Err("shortvec length exceeds u16".into());
+            }
             return Ok((n, i + 1));
         }
         shift += 7;
@@ -142,7 +155,14 @@ pub fn compile_legacy_message(
     if keys.len() > 255 {
         return Err("too many account keys".into());
     }
-    let num_required_signatures = keys.iter().filter(|k| k.is_signer).count() as u8;
+    let signer_count = keys.iter().filter(|k| k.is_signer).count();
+    // A signature count >= 128 sets the high bit of the first message byte,
+    // which is exactly the versioned (v0) marker parse_tx_base64 rejects; guard
+    // it so the compiler never emits a message its own parser would refuse.
+    if signer_count >= 128 {
+        return Err("too many required signatures".into());
+    }
+    let num_required_signatures = signer_count as u8;
     let num_readonly_signed = keys
         .iter()
         .filter(|k| k.is_signer && !k.is_writable)
@@ -197,6 +217,7 @@ pub fn unsigned_tx_base64(msg: &CompiledMessage) -> String {
 }
 
 /// A parsed legacy message, for the xray decoder.
+#[derive(Debug)]
 pub struct ParsedMessage {
     pub num_required_signatures: u8,
     pub num_readonly_signed: u8,
@@ -206,6 +227,7 @@ pub struct ParsedMessage {
     pub instructions: Vec<ParsedInstruction>,
 }
 
+#[derive(Debug)]
 pub struct ParsedInstruction {
     pub program_id: Pubkey,
     pub accounts: Vec<Pubkey>,
@@ -220,6 +242,12 @@ pub fn parse_tx_base64(b64: &str) -> Result<ParsedMessage, String> {
         .decode(b64.trim())
         .map_err(|e| format!("invalid base64: {e}"))?;
     let (nsigs, mut pos) = shortvec_read(&raw)?;
+    // Each signature slot is 64 bytes; reject a count that cannot fit before
+    // multiplying, so a tiny hostile payload cannot claim a huge signature
+    // vector.
+    if nsigs.saturating_mul(64) > raw.len() {
+        return Err("signature count exceeds buffer".into());
+    }
     pos += nsigs * 64;
     if raw.len() < pos + 3 {
         return Err("truncated transaction".into());
@@ -233,6 +261,12 @@ pub fn parse_tx_base64(b64: &str) -> Result<ParsedMessage, String> {
     pos += 3;
     let (nkeys, used) = shortvec_read(&raw[pos..])?;
     pos += used;
+    // Each key is 32 bytes; reject an impossible count before reserving, so a
+    // small payload cannot force a large eager allocation under the wasm
+    // memory cap.
+    if nkeys.saturating_mul(32) > raw.len().saturating_sub(pos) {
+        return Err("account key count exceeds buffer".into());
+    }
     let mut account_keys = Vec::with_capacity(nkeys);
     for _ in 0..nkeys {
         if raw.len() < pos + 32 {
@@ -251,6 +285,11 @@ pub fn parse_tx_base64(b64: &str) -> Result<ParsedMessage, String> {
     pos += 32;
     let (nixs, used) = shortvec_read(&raw[pos..])?;
     pos += used;
+    // Each instruction needs at least a program index byte; reject a count
+    // that cannot fit before reserving.
+    if nixs > raw.len().saturating_sub(pos) {
+        return Err("instruction count exceeds buffer".into());
+    }
     let mut instructions = Vec::with_capacity(nixs);
     for _ in 0..nixs {
         if raw.len() < pos + 1 {
@@ -260,6 +299,10 @@ pub fn parse_tx_base64(b64: &str) -> Result<ParsedMessage, String> {
         pos += 1;
         let (nacc, used) = shortvec_read(&raw[pos..])?;
         pos += used;
+        // Each account reference is a single index byte.
+        if nacc > raw.len().saturating_sub(pos) {
+            return Err("account index count exceeds buffer".into());
+        }
         let mut accounts = Vec::with_capacity(nacc);
         for _ in 0..nacc {
             let i = *raw.get(pos).ok_or("truncated account index")? as usize;

@@ -160,5 +160,8 @@ async fn real_host_tx_xray_decodes_offline() {
         .expect("execute must not trap");
     assert!(result.success, "decode failed: {:?}", result.error);
     let output = result.output.to_string();
-    assert!(output.contains("Memo"), "receipt missing memo line: {output}");
+    assert!(
+        output.contains("Memo"),
+        "receipt missing memo line: {output}"
+    );
 }
