@@ -39,9 +39,11 @@ program in an inspected transaction → flagged, never guessed. Tests assert
 policy rejections make **zero RPC calls**, and the happy path re-parses the
 produced transaction and verifies Squads instruction bytes, PDAs, and the
 embedded amount. Anchor discriminators are re-derived from a real sha256 of
-the Squads v4 instruction names, and a fixture harness is ready to pin the
-encoders byte-for-byte against a proposal from the official Squads app (the
-captured fixture lands before submission). A host-smoke harness loads the built
+the Squads v4 instruction names, and a fixture test pins the encoders
+byte-for-byte against a real `VaultTransactionCreate` + `ProposalCreate`
+transaction produced on chain by the official `@sqds/multisig` client (the
+library the Squads app runs) and captured from devnet. A host-smoke harness
+loads the built
 components through the real ZeroClaw wasmtime adapter — metadata probe,
 flat-config injection, policy refusals, and offline decode all pass on the
 production code path.

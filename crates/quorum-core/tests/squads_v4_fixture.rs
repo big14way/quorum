@@ -1,17 +1,17 @@
-//! The single highest-value test in the project: pin the encoders to a real
-//! proposal created by the official Squads app.
+//! The single highest-value test in the project: pin the encoders to a REAL
+//! Squads v4 proposal produced by the official `@sqds/multisig` client — the
+//! same library the Squads app runs — captured live from devnet.
 //!
-//! Capture flow (see tools/fetch-fixture.py):
-//!   1. Create a proposal from the official Squads app on the multisig.
-//!   2. python3 tools/fetch-fixture.py <signature> <rpc_url> writes
-//!      tests/fixtures/mainnet_proposal.json next to this test.
-//!   3. Remove the #[ignore] below. From then on the fixture runs in every
-//!      plain `cargo test`, with no network.
+//! The fixture (tests/fixtures/squads_v4_proposal.json) holds the base64 of a
+//! transaction that ran VaultTransactionCreate + ProposalCreate against the
+//! Squads v4 program (SQDS4ep…) on a real 2-of-3 multisig. This test re-derives
+//! every derivable byte with our own encoders and asserts exact equality:
+//! discriminators, borsh args, account ordering, and both PDAs. It is fully
+//! offline and runs in every plain `cargo test`.
 //!
-//! The test re-derives every derivable byte of the captured transaction with
-//! our own encoders and asserts exact equality: discriminators, borsh args,
-//! account ordering, and PDAs. If the app files a v0 transaction the parse
-//! fails loudly here — that is a real signal, not an inconvenience, because
+//! To refresh or move to mainnet: generate a proposal (scratch gen.mjs, or the
+//! app), then fetch the transaction base64 (tools/fetch-fixture.py) and replace
+//! the fixture. A v0 message would fail the parse loudly — a real signal, since
 //! squads-propose emits legacy messages and tx-xray rejects v0 by design.
 
 use quorum_core::message::parse_tx_base64;
@@ -23,15 +23,13 @@ use quorum_core::squads::{
 };
 
 #[test]
-#[ignore = "requires tests/fixtures/mainnet_proposal.json captured from the official Squads app"]
-fn squads_app_proposal_fixture_pins_encoders() {
+fn squads_v4_proposal_fixture_pins_encoders() {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/tests/fixtures/mainnet_proposal.json"
+        "/tests/fixtures/squads_v4_proposal.json"
     );
-    let raw = std::fs::read_to_string(path).unwrap_or_else(|e| {
-        panic!("fixture missing at {path}: {e}; run tools/fetch-fixture.py first")
-    });
+    let raw =
+        std::fs::read_to_string(path).unwrap_or_else(|e| panic!("fixture missing at {path}: {e}"));
     let fixture: serde_json::Value = serde_json::from_str(&raw).expect("fixture is not JSON");
     let tx_b64 = fixture["tx_base64"]
         .as_str()

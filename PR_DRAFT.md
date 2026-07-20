@@ -58,9 +58,10 @@ Solana plugin here.
 - Ground truth: Anchor discriminators are re-derived in-test from a real
   sha256 of the Squads v4 instruction/account names (`global:…` / `account:…`);
   base58 constants and PDA vectors match an independent pure-Python
-  implementation. A fixture harness that pins the encoders byte-for-byte to a
-  proposal created by the official Squads app is committed; the captured
-  fixture lands before this PR leaves draft.
+  implementation. A fixture test pins the encoders byte-for-byte against a
+  real `VaultTransactionCreate` + `ProposalCreate` transaction produced on
+  chain by the official `@sqds/multisig` client (the library the Squads app
+  runs), captured from devnet — it runs offline in every `cargo test`.
 - Adversarial hardening: the suite passed a multi-agent audit (find →
   independent verify) covering the Squads/SPL wire encoding, the fail-closed
   policy, wasm trap-safety on untrusted input, and receipt integrity; the
